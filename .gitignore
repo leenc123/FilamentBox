@@ -14,3 +14,4 @@ firmware/filament_box/libraries/
 
 # 本地工具配置
 .opencode/
+.opencode
