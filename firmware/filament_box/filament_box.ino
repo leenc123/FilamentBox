@@ -14,6 +14,7 @@
 #include "wifi_portal.h"
 #include "printer_setup.h"
 #include "web_dash.h"
+#include "status_led.h"
 
 #define WIFI_DOWN_REBOOT_MS 120000  // 运行中掉线超此时长没连上则重启（重启后自动进配网）
 
@@ -86,6 +87,7 @@ static bool pushSlotNow(uint8_t i, String& errOut) {
       printerHintShown = false;
       shownKey = "";
     }
+    ledSuccessPulse();  // SENT 脉冲：快闪 3 下后回心跳
     String shown = String(shortFilamentName(info));
     if (shown.length() > 12) shown = shown.substring(0, 12);
     statusText = "SENT " + String(trayDisplayNo(i)) + " " + shown;
@@ -100,6 +102,7 @@ static bool pushSlotNow(uint8_t i, String& errOut) {
   if (pushFailStreak >= PRINTER_HINT_STREAK &&
       WiFi.status() == WL_CONNECTED) {
     printerHintShown = true;
+    ledSet(LED_ERROR);  // 告警快闪，直到推送成功恢复
   }
   return false;
 }
@@ -192,6 +195,8 @@ void setup() {
   Serial.println("[BOOT] start");
   reader.begin();
   Serial.println("[BOOT] reader ok");
+  ledBegin();  // GPIO2 strapping 安全点：reader 之后、按键判断之前
+  ledSet(LED_WIFI_CONNECT);
 
   // 启动写卡模式：按住按键超 3 秒进 AP（阻塞，不再往下走）
   if (shouldEnterWriteMode(BUTTON_PIN, BUTTON_HOLD_MS)) {
@@ -210,6 +215,7 @@ void setup() {
   // 无网络自动开 AP 配网（阻塞直到配网成功重启；OLED 显示进度）
   ensureWifiOrPortal(&ui);
   Serial.println("[BOOT] wifi ok");
+  ledSet(LED_HEARTBEAT);  // 联网成功回心跳
 
   // 开机 IP 页：连上 WiFi 先显示本机 IP，停几秒再切主页
   if (ui.ok()) {
@@ -223,7 +229,7 @@ void setup() {
     ui.showLines(splash, 5);
     Serial.print("[BOOT] ip ");
     Serial.println(WiFi.localIP());
-    delay(OLED_IP_SPLASH_MS);
+    for (uint16_t w = 0; w < OLED_IP_SPLASH_MS; w += 50) { ledTick(); delay(50); }
     shownKey = "";  // 强制重刷主页
   }
 
@@ -241,8 +247,11 @@ void setup() {
 }
 
 void loop() {
+  ledTick();
   // 运行中掉线：OLED 显示重连状态；超 2 分钟连不上则重启（重启后自动进配网）
   if (WiFi.status() != WL_CONNECTED) {
+    ledSet(LED_WIFI_CONNECT);
+    ledTick();
     if (wifiDownSince == 0) {
       wifiDownSince = millis();
       WiFi.disconnect();
@@ -252,7 +261,7 @@ void loop() {
     statusText = "WiFi retry";
     refreshOled();
     if (millis() - wifiDownSince > WIFI_DOWN_REBOOT_MS) ESP.restart();
-    delay(POLL_MS);
+    for (uint16_t w = 0; w < POLL_MS; w += 50) { ledTick(); delay(50); }
     return;
   }
   if (wifiDownSince != 0) {
@@ -260,6 +269,7 @@ void loop() {
     wifiDownSince = 0;
     statusText = "idle";
     shownKey = "";
+    if (!printerHintShown) ledSet(LED_HEARTBEAT);
   }
   printerSetupHandle();  // 常驻 /setup 配置页请求处理
 
@@ -287,5 +297,5 @@ void loop() {
   }
 
   refreshOled();
-  delay(POLL_MS);
+  for (uint16_t w = 0; w < POLL_MS; w += 50) { ledTick(); delay(50); }
 }

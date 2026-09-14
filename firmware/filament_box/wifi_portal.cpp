@@ -7,6 +7,7 @@
 #include "wifi_portal.h"
 #include "config.h"
 #include "oled_ui.h"
+#include "status_led.h"
 
 #define PORTAL_TIMEOUT_MS 15000  // 开机直连超时：超则自动进 AP 配网
 
@@ -47,14 +48,16 @@ bool connectWifiWith(const String& ssid, const String& pass,
   Serial.print("[WIFI] begin ");
   Serial.println(ssid);
   WiFi.begin(ssid.c_str(), pass.c_str());
+  ledSet(LED_WIFI_CONNECT);
   unsigned long t0 = millis();
   uint8_t dots = 0;
   while (WiFi.status() != WL_CONNECTED && millis() - t0 < timeoutMs) {
+    ledTick();
     String d = "";
     for (uint8_t i = 0; i <= dots % 3; i++) d += ".";
     portalScreen(ui, "FBX WiFi", ssid, "Connecting" + d, "", "", "");
     dots++;
-    delay(500);
+    for (uint8_t w = 0; w < 10; w++) { ledTick(); delay(50); }
   }
   Serial.print("[WIFI] result ");
   Serial.println(WiFi.status() == WL_CONNECTED ? "OK" : "FAIL");
@@ -63,6 +66,7 @@ bool connectWifiWith(const String& ssid, const String& pass,
 
 static void runPortal(OledUi* ui) {
   Serial.println("[WIFI] start portal AP");
+  ledSet(LED_AP_PORTAL);
   WiFiManager wm;
   // 配网 AP 与之前手写页同名同 IP，老文档不用改
   wm.setAPStaticIPConfig(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1),
@@ -82,6 +86,7 @@ static void runPortal(OledUi* ui) {
   unsigned long lastUi = 0;
   while (WiFi.status() != WL_CONNECTED) {  // 配网成功即跳出存 NVS + 重启
     wm.process();  // 非阻塞配网服务：处理配网页请求 + captive portal
+    ledTick();
     if (millis() - lastUi > 1000) {
       lastUi = millis();
       // 5 行（含死区裁剪）：标题 + AP 名 + IP + 操作指引 + 在线数

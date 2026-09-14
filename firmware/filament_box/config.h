@@ -45,5 +45,10 @@ inline uint8_t trayDisplayNo(uint8_t i) { return (uint8_t)(SLOT_TRAY[i] + 1); }
 #define BUTTON_PIN 33
 #define BUTTON_HOLD_MS 3000  // 启动时按住超此时长进 AP 写卡模式
 
+// ---- 板载状态灯（D2 = GPIO2 板载蓝灯，高电平亮）----
+// GPIO2 是 strapping 脚：setup() 之前不驱动，reader.begin() 之后再 ledBegin() 即安全
+#define LED_PIN 2
+#define LED_ACTIVE_HIGH 1
+
 // ---- 写卡 AP ----
 #define SETUP_AP_SSID "FilamentBox-SETUP"

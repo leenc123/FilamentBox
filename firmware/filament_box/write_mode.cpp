@@ -5,6 +5,7 @@
 #include "config.h"
 #include "filament_map.h"
 #include "rfid_store.h"
+#include "status_led.h"
 
 static WebServer server(80);
 static RfidReader* g_reader = nullptr;
@@ -136,6 +137,7 @@ static void handleWrite() {
 
 void runWriteMode(RfidReader& reader) {
   g_reader = &reader;
+  ledSet(LED_AP_PORTAL);  // 写卡 AP 与配网 AP 同灯语：双闪
   WiFi.mode(WIFI_AP);
   WiFi.softAPConfig(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1),
                     IPAddress(255, 255, 255, 0));
@@ -145,6 +147,7 @@ void runWriteMode(RfidReader& reader) {
   server.begin();
   while (true) {
     server.handleClient();
+    ledTick();
     delay(2);
   }
 }
