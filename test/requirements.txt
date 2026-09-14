@@ -1,0 +1,2 @@
+paho-mqtt
+amqtt  # test/ 本地 broker 用（假打印机联调）

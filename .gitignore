@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+test/myenv/
+.venv/
+
+# Arduino 构建产物
+build/
+*.hex
+*.elf
+
+# 第三方 Arduino 库备份（按 README 用库管理器安装：MFRC522 / PubSubClient / U8g2 / WiFiManager）
+firmware/filament_box/libraries/
+
+# 本地工具配置
+.opencode/
