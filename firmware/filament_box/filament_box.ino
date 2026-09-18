@@ -167,11 +167,15 @@ static void handleDashWrite() {
     web.send(400, "text/html; charset=utf-8", dashWriteForm("encode fail", false));
     return;
   }
+  Serial.printf("[WRITE] slot %d type %s color %s\n",
+                slot, type.c_str(), color.c_str());
   if (!reader.writeSlot((uint8_t)slot, b4, b5)) {
+    Serial.printf("[WRITE] slot %d failed\n", slot);
     web.send(500, "text/html; charset=utf-8",
              dashWriteResult(false, "write failed: 卡是否放在该槽读卡器上?"));
     return;
   }
+  Serial.printf("[WRITE] slot %d OK\n", slot);
   // 写成功：同步槽位快照并立即推送到对应 AMS 槽验证；
   // slotSent 先留空：推送失败时主循环按正常流程自动重试
   slotKey[slot] = type + "|" + color;

@@ -125,11 +125,15 @@ static void handleWrite() {
     server.send(400, "text/html; charset=utf-8", buildForm("encode fail"));
     return;
   }
+  Serial.printf("[WRITE] slot %d type %s color %s\n",
+                slot, type.c_str(), color.c_str());
   if (!g_reader->writeSlot((uint8_t)slot, b4, b5)) {
+    Serial.printf("[WRITE] slot %d failed\n", slot);
     server.send(500, "text/html; charset=utf-8",
                 buildForm("write failed: 卡是否放在该槽读卡器上?"));
     return;
   }
+  Serial.printf("[WRITE] slot %d OK\n", slot);
   server.send(200, "text/html; charset=utf-8",
               buildForm("OK 槽位 " + String(trayDisplayNo((uint8_t)slot)) + " " + String(winfo->name) +
                         " " + color + "（复位回到正常模式刷卡验证）"));

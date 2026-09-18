@@ -11,12 +11,14 @@ public:
   void begin();
   uint8_t count() const { return _n; }
   // 读指定槽位：成功返回 true 并填满 b4/b5（各 16B）；无卡/认证失败返回 false
+  // Classic 1K 走扇区1 Block4/5；NTAG213/215/216 走用户页 4-11（8 页共 32B，内容格式与 b4/b5 完全一致）
   bool readSlot(uint8_t i, uint8_t b4[16], uint8_t b5[16]);
-  // 写指定槽位（KeyB 全 FF）：写完重读校验一致返回 true
+  // 写指定槽位：Classic 用 KeyB 全 FF；NTAG 无需认证直接写页；写完halt前重读校验一致返回 true
   bool writeSlot(uint8_t i, const uint8_t b4[16], const uint8_t b5[16]);
 
 private:
   bool selectCard(uint8_t i, MFRC522::Uid& uid);
+  bool isUltralight(MFRC522* r);
   uint8_t _sck, _mosi, _miso, _rst, _n;
   const uint8_t* _cs;
   MFRC522* _pcs[8];  // 上限 8 路，当前用 4 路
