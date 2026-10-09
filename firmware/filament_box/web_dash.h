@@ -14,3 +14,6 @@ String dashHome(const DashSlot slots[4], const String& status);
 String dashWriteForm(const String& msg, bool ok);
 // 写卡结果页
 String dashWriteResult(bool ok, const String& msg);
+// 日志页（首屏 80 行 + 1 秒 fetch 轮询）；纯文本全量（复制排查用）
+String dashLogPage(const String& status, uint32_t cursor);
+String dashLogText();

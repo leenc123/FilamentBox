@@ -1,5 +1,6 @@
 // web_dash.cpp
 #include "web_dash.h"
+#include "log_ring.h"
 #include "config.h"
 #include "filament_map.h"
 
@@ -80,6 +81,7 @@ String dashHome(const DashSlot slots[4], const String& status) {
   h += "</div>"
        "<div class='row2'><a class='btn2' href='/write'>写卡</a>"
        "<a class='btn2 ghost' href='/setup'>打印机配置</a></div>"
+       "<div class='row2'><a class='btn2 ghost' href='/log'>调试日志</a></div>"
        "</div></body></html>";
   return h;
 }
@@ -125,4 +127,52 @@ String dashWriteResult(bool ok, const String& msg) {
        "<a class='btn2 ghost' href='/'>管理首页</a></div>"
        "</div></body></html>";
   return h;
+}
+
+String dashLogPage(const String& status, uint32_t cursor) {
+  String h = "<!doctype html><html><head><meta charset='utf-8'>"
+             "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+             "<title>FilamentBox 日志</title>";
+  h += DASH_STYLE;
+  h += "<style>"
+       "pre{white-space:pre-wrap;word-break:break-all;background:#0f172a;color:#e2e8f0;"
+       "padding:12px;border-radius:8px;font-size:12px;max-height:60vh;overflow-y:auto}"
+       "</style>";
+  h += "</head><body><div class='card'>"
+       "<h3>调试日志</h3>"
+       "<p class='sub'>状态：" + esc(status) + "（最新 80 行，约每秒更新）</p>"
+       "<pre id='log'>";
+  for (uint8_t i = 0; i < logCount(); i++) h += esc(logAt(i)) + "\n";
+  h += "</pre>"
+       "<div class='row2'><a class='btn2 ghost' href='/log.txt'>纯文本</a>"
+       "<a class='btn2 ghost' href='/' style='flex:1;text-align:center'>首页</a></div>"
+       "<form method='POST' action='/log/clear'>"
+       "<input class='btn' type='submit' value='清空日志'></form>"
+       "<p class='hint'><a href='/'>&larr; 返回管理首页</a></p>"
+       "</div>"
+       "<script>"
+       "var pre=document.getElementById('log');"
+       "var cursor=" + String(cursor) + ";"
+       "var stick=true;"
+       "pre.addEventListener('scroll',function(){"
+       "stick=(pre.scrollTop+pre.clientHeight>=pre.scrollHeight-30);});"
+       "if(stick){pre.scrollTop=pre.scrollHeight;}"
+       "setInterval(function(){"
+       "fetch('/log/stream?cursor='+cursor).then(function(r){return r.text();}).then(function(t){"
+       "var l=t.split('\\n');"
+       "if(l.length&&l[0].indexOf('CURSOR ')==0){cursor=parseInt(l[0].slice(7),10)||cursor;}"
+       "for(var i=1;i<l.length;i++){if(l[i].length){pre.textContent+=l[i]+'\\n';}}"
+       "var n=pre.textContent.split('\\n');"
+       "if(n.length>90){pre.textContent=n.slice(n.length-90).join('\\n');}"
+       "if(stick){pre.scrollTop=pre.scrollHeight;}"
+       "});},1000);"
+       "</script>"
+       "</body></html>";
+  return h;
+}
+
+String dashLogText() {
+  String t;
+  for (uint8_t i = 0; i < logCount(); i++) t += logAt(i) + "\n";
+  return t;
 }
