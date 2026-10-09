@@ -1,7 +1,12 @@
 #pragma once
 // oled_ui.h — SSD1306 状态显示（U8g2，128x64，6x10 大字体，顶部死区可配）
+// MiaoUI 与本模块共用同一个 U8g2 对象（见 oledShareU8g2），避免双缓冲/双 begin 冲突。
 #include <Arduino.h>
 #include <stdint.h>
+#include <U8g2lib.h>
+
+// 返回全局 U8g2 单例（MiaoUI HAL 用；C++ 调用方专用，MiaoUI 纯 C 文件禁止 include 本头）
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C& oledShareU8g2();
 
 class OledUi {
 public:

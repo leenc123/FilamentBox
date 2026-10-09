@@ -36,14 +36,17 @@ inline uint8_t trayDisplayNo(uint8_t i) { return (uint8_t)(SLOT_TRAY[i] + 1); }
 #define OLED_SDA_PIN 21
 #define OLED_SCL_PIN 22
 #define OLED_ADDR 0x3C
-// 顶部死区：屏幕上边坏掉的像素行数，坏区一个像素都不用（默认 10，健康屏填 0）
-#define OLED_TOP_DEAD 10
+// 顶部死区：屏幕上边坏掉的像素行数，坏区一个像素都不用（健康屏 0；坏顶屏改回 10，
+// 同时把 miaoui/ui_conf.h 的 UI_PAGE_INIT_Y 改为 UI_FONT_HIGHT + 10）
+#define OLED_TOP_DEAD 0
 // 开机 IP 页停留毫秒数（WiFi 连上后显示本机 IP，然后自动切主页）
 #define OLED_IP_SPLASH_MS 3000
 
-// ---- 写卡按键（输入上拉，接地为按下）----
-#define BUTTON_PIN 33
-#define BUTTON_HOLD_MS 3000  // 启动时按住超此时长进 AP 写卡模式
+// ---- 按键（输入上拉，接地为按下；MiaoUI 三键：上/下/确认）----
+#define BUTTON_PIN 33       // 确认键（菜单确认 / 执行）
+#define BTN_UP_PIN 32       // MiaoUI 上键（新增，接 GND）
+#define BTN_DOWN_PIN 25     // MiaoUI 下键（新增，接 GND）
+#define BTN_ENTER_PIN BUTTON_PIN  // MiaoUI 确认键复用旧按键
 
 // ---- 板载状态灯（D2 = GPIO2 板载蓝灯，高电平亮）----
 // GPIO2 是 strapping 脚：setup() 之前不驱动，reader.begin() 之后再 ledBegin() 即安全

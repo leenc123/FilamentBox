@@ -34,11 +34,6 @@ static const FilamentInfo FILAMENT_TABLE[] = {
   {"GFA16", "PLA", "Bambu PLA Wood", 190, 240},
   {"GFA17", "PLA", "Bambu PLA Translucent", 190, 240},
   {"GFA18", "PLA", "Bambu PLA Lite", 190, 240},
-  {"GFL00", "PLA", "PolyLite PLA", 190, 240},
-  {"GFL01", "PLA", "PolyTerra PLA", 190, 240},
-  {"GFL03", "PLA", "eSUN PLA+", 190, 240},
-  {"GFL04", "PLA", "Overture PLA", 190, 240},
-  {"GFL05", "PLA", "Overture Matte PLA", 190, 240},
   {"GFL95", "PLA", "Generic PLA High Speed", 190, 240},
   {"GFL96", "PLA", "Generic PLA Silk", 190, 240},
   {"GFL99", "PLA", "Generic PLA", 190, 240},
@@ -57,20 +52,16 @@ static const FilamentInfo FILAMENT_TABLE[] = {
   {"GFG00", "PETG", "Bambu PETG Basic", 230, 270},
   {"GFG01", "PETG", "Bambu PETG Translucent", 230, 270},
   {"GFG02", "PETG", "Bambu PETG HF", 230, 270},
-  {"GFG60", "PETG", "PolyLite PETG", 220, 260},
-  {"GFL06", "PETG", "Fiberon PETG-ESD", 250, 290},
   {"GFG96", "PETG", "Generic PETG HF", 220, 270},
   {"GFG99", "PETG", "Generic PETG", 220, 270},
   {"GFSG99", "PETG", "Generic PETG", 220, 270},
   // ---- PETG-CF ----
   {"GFG50", "PETG-CF", "Bambu PETG-CF", 240, 270},
-  {"GFL55", "PETG-CF", "Fiberon PETG-rCF", 240, 270},
   {"GFG98", "PETG-CF", "Generic PETG-CF", 240, 270},
   // ---- PCTG ----
   {"GFG97", "PCTG", "Generic PCTG", 240, 270},
   // ---- ABS ----
   {"GFB00", "ABS", "Bambu ABS", 240, 280},
-  {"GFB60", "ABS", "PolyLite ABS", 240, 280},
   {"GFB99", "ABS", "Generic ABS", 240, 280},
   {"GFSB99", "ABS", "Generic ABS", 240, 280},
   {"GFS06", "ABS", "Bambu Support for ABS", 240, 270},
@@ -78,7 +69,6 @@ static const FilamentInfo FILAMENT_TABLE[] = {
   {"GFB50", "ABS-GF", "Bambu ABS-GF", 240, 280},
   // ---- ASA ----
   {"GFB01", "ASA", "Bambu ASA", 240, 280},
-  {"GFB61", "ASA", "PolyLite ASA", 240, 280},
   {"GFB98", "ASA", "Generic ASA", 240, 280},
   {"GFSB98", "ASA", "Generic ASA", 240, 280},
   // ---- ASA-AERO ----
@@ -87,22 +77,18 @@ static const FilamentInfo FILAMENT_TABLE[] = {
   {"GFB51", "ASA-CF", "Bambu ASA-CF", 250, 280},
   // ---- PA ----
   {"GFN99", "PA", "Generic PA", 240, 280},
-  {"GFL53", "PA", "Fiberon PA612-CF", 260, 300},
   {"GFSN98", "PA", "Generic PA", 240, 280},
   {"GFS01", "PA", "Bambu Support G", 260, 300},
   {"GFS03", "PA", "Bambu Support For PA/PET", 260, 300},
   // ---- PA-CF ----
   {"GFN03", "PA-CF", "Bambu PA-CF", 260, 300},
   {"GFN04", "PA-CF", "Bambu PAHT-CF", 260, 300},
-  {"GFL52", "PA-CF", "Fiberon PA12-CF", 260, 300},
   {"GFN98", "PA-CF", "Generic PA-CF", 260, 300},
   {"GFSN99", "PA-CF", "Generic PA-CF", 260, 300},
   // ---- PA6-CF ----
   {"GFN05", "PA6-CF", "Bambu PA6-CF", 260, 300},
-  {"GFL50", "PA6-CF", "Fiberon PA6-CF", 280, 300},
   // ---- PA-GF ----
   {"GFN08", "PA-GF", "Bambu PA6-GF", 260, 300},
-  {"GFL51", "PA-GF", "Fiberon PA6-GF", 280, 300},
   // ---- PC ----
   {"GFC00", "PC", "Bambu PC", 260, 290},
   {"GFC01", "PC", "Bambu PC FR", 260, 290},
@@ -110,7 +96,6 @@ static const FilamentInfo FILAMENT_TABLE[] = {
   {"GFSC99", "PC", "Generic PC", 260, 290},
   // ---- PET-CF ----
   {"GFT01", "PET-CF", "Bambu PET-CF", 260, 290},
-  {"GFL54", "PET-CF", "Fiberon PET-CF", 270, 300},
   // ---- PPS ----
   {"GFT97", "PPS", "Generic PPS", 300, 340},
   // ---- PPS-CF ----
@@ -156,6 +141,44 @@ static const FilamentInfo FILAMENT_TABLE[] = {
 };
 static const size_t FILAMENT_COUNT = sizeof(FILAMENT_TABLE) / sizeof(FILAMENT_TABLE[0]);
 
+// 屏上快捷写卡表：常用 12 个预设 ID（屏上 Write 页数字选择器用；
+// 网页 /write 仍用上面全表）。改这里即改屏上可选范围，无需动菜单代码。
+static const char* FILAMENT_QUICK[] = {
+  "GFL99", "GFA01", "GFA00", "GFA05",
+  "GFG99", "GFG00", "GFG02",
+  "GFB99", "GFB00", "GFB01",
+  "GFU99", "GFU00",
+};
+static const size_t FILAMENT_QUICK_COUNT =
+    sizeof(FILAMENT_QUICK) / sizeof(FILAMENT_QUICK[0]);
+
+// 屏上 Write 页材料表：6 个常用家族 × 官方/通用两档（B=0/G=1）。
+// 每档只收敛一个代表预设（写卡+推送用），全量预设仍走网页 /write。
+// 新增家族只加一行，菜单代码无需改动（上限由 fbxMatCount() 暴露）。
+struct ScreenMat {
+  const char* family;   // 家族名（推送 tray_type 用）
+  const char* bambu;    // 官方代表预设 ID
+  const char* generic;  // 通用代表预设 ID
+};
+static const ScreenMat SCREEN_MATS[] = {
+  {"PLA",   "GFA01", "GFL99"},
+  {"PETG",  "GFG00", "GFG99"},
+  {"ABS",   "GFB00", "GFB99"},
+  {"ASA",   "GFB01", "GFB98"},
+  {"TPU",   "GFU00", "GFU99"},
+  {"PA-CF", "GFN03", "GFN98"},
+};
+static const size_t SCREEN_MAT_COUNT =
+    sizeof(SCREEN_MATS) / sizeof(SCREEN_MATS[0]);
+
+// 屏上 Write 页常用色：12 色，存 FILAMENT_COLORS 下标（0-27）。
+// 屏上选择器 0-11 步进，OLED 无中文字库，英文短名由菜单层维护显示。
+static const uint8_t SCREEN_COLORS[] = {
+  0, 1, 2, 8, 10, 12, 17, 20, 23, 15, 13, 5,
+};
+static const size_t SCREEN_COLOR_COUNT =
+    sizeof(SCREEN_COLORS) / sizeof(SCREEN_COLORS[0]);
+
 // 旧版卡片（Block4 存家族名字符串）的别名 → 新预设，保证已写好的卡继续可用
 // 注意旧版 PA-CF 曾指向不存在的 GFN00，现归并到官方 Bambu PA-CF（GFN03）
 struct FilamentAlias {
@@ -186,11 +209,11 @@ inline const FilamentInfo* lookupFilament(const String& key) {
   return nullptr;
 }
 
-// 显示短名：去掉厂商前缀（Bambu / Generic / PolyLite / PolyTerra / eSUN / Overture / Fiberon）
-inline const char* shortFilamentName(const FilamentInfo* info) {
+// 显示短名：去掉厂商前缀（Bambu / Generic）
+  inline const char* shortFilamentName(const FilamentInfo* info) {
   if (!info || !info->name) return "?";
   static const char* kVendors[] = {
-    "Bambu", "Generic", "PolyLite", "PolyTerra", "eSUN", "Overture", "Fiberon",
+    "Bambu", "Generic",
   };
   const char* sp = strchr(info->name, ' ');
   if (!sp) return info->name;

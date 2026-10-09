@@ -1,0 +1,149 @@
+﻿# make_cn12_font.ps1 — FilamentBox OLED 12px 中文子集点阵生成（可复现资产）
+#
+# 输入 : <repo>/tools/cn12_codepoints.txt（每行 U+XXXX，由 dump_cn_codepoints.py 生成后拷入）
+#        无此文件则回退读 $env:TEMP/opencode/cn12.txt
+# 输出 : firmware/filament_box/src/miaoui/fonts/font_cn12.c / font_cn12.h
+#        校样图 <TEMP>/cn12_specimen.bmp（提交前必须肉眼确认）
+#
+# 渲染：系统宋体(SimSun) 12px + 单色网格对齐，无需安装任何东西。
+# 行 x 字节顺序与 u8g2_DrawXBMP 一致（每行 2 字节，LSB=左）。
+Add-Type -AssemblyName System.Drawing
+$ErrorActionPreference = "Stop"
+
+$repo = Split-Path (Split-Path $MyInvocation.MyCommand.Path -Parent) -Parent
+$cpFile = Join-Path (Split-Path $MyInvocation.MyCommand.Path -Parent) "cn12_codepoints.txt"
+if (-not (Test-Path -LiteralPath $cpFile)) { $cpFile = "$env:TEMP/opencode/cn12.txt" }
+$cps = Get-Content -LiteralPath $cpFile | Where-Object { $_ -match '^U\+([0-9A-Fa-f]{4,6})$' } |
+  ForEach-Object { [Convert]::ToInt32($Matches[1], 16) }
+if ($cps.Count -eq 0) { throw "no codepoints in $cpFile" }
+
+$font = New-Object System.Drawing.Font("SimSun", 12, [System.Drawing.FontStyle]::Regular, [System.Drawing.GraphicsUnit]::Pixel)
+$W = 12; $H = 12
+
+function Get-GlyphBits([int]$cp) {
+  $ch = [char]::ConvertFromUtf32($cp)
+  $bmp = [System.Drawing.Bitmap]::new(40, 40, [System.Drawing.Imaging.PixelFormat]::Format24bppRgb)
+  $g = [System.Drawing.Graphics]::FromImage($bmp)
+  try {
+    $g.Clear([System.Drawing.Color]::White)
+    $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::SingleBitPerPixelGridFit
+    $g.DrawString($ch, $font, [System.Drawing.Brushes]::Black, 10.0, 8.0)
+  } finally { $g.Dispose() }
+  $rect = [System.Drawing.Rectangle]::new(0, 0, 40, 40)
+  $ld = $bmp.LockBits($rect, [System.Drawing.Imaging.ImageLockMode]::ReadOnly, $bmp.PixelFormat)
+  try {
+    $stride = $ld.Stride
+    $buf = New-Object byte[] ($stride * 40)
+    [Runtime.InteropServices.Marshal]::Copy($ld.Scan0, $buf, 0, $buf.Length)
+  } finally { $bmp.UnlockBits($ld); $bmp.Dispose() }
+  $minX = 40; $maxX = -1; $minY = 40; $maxY = -1
+  for ($y = 0; $y -lt 40; $y++) {
+    for ($x = 0; $x -lt 40; $x++) {
+      $o = $y * $stride + $x * 3
+      $lum = ($buf[$o] + $buf[$o + 1] + $buf[$o + 2]) / 3
+      if ($lum -lt 128) {
+        if ($x -lt $minX) { $minX = $x }
+        if ($x -gt $maxX) { $maxX = $x }
+        if ($y -lt $minY) { $minY = $y }
+        if ($y -gt $maxY) { $maxY = $y }
+      }
+    }
+  }
+  $bits = New-Object byte[] 24
+  if ($maxX -lt 0) { return @{ cp = $cp; bits = $bits; empty = $true } }
+  $bw = $maxX - $minX + 1; $bh = $maxY - $minY + 1
+  if ($bw -gt 12 -or ($bh -gt 12)) { Write-Warning ("U+{0:X4} bbox {1}x{2} overflow, clipped" -f $cp, $bw, $bh) }
+  $dx = [Math]::Max(0, [Math]::Floor((12 - $bw) / 2))
+  $dy = [Math]::Max(0, 12 - $bh)   # 底部对齐，各字基线一致
+  for ($y = 0; $y -lt 12; $y++) {
+    $row = New-Object byte[] 2
+    for ($x = 0; $x -lt 12; $x++) {
+      $sx = $minX + ($x - $dx); $sy = $minY + ($y - $dy)
+      $ink = $false
+      if ($sx -ge $minX -and $sx -le $maxX -and $sy -ge $minY -and $sy -le $maxY) {
+        $o = $sy * $stride + $sx * 3
+        $ink = (($buf[$o] + $buf[$o + 1] + $buf[$o + 2]) / 3) -lt 128
+      }
+      if ($ink) { $row[$x -shr 3] = $row[$x -shr 3] -bor (1 -shl ($x % 8)) }
+    }
+    $bits[$y * 2] = $row[0]; $bits[$y * 2 + 1] = $row[1]
+  }
+  return @{ cp = $cp; bits = $bits; empty = $false }
+}
+
+$glyphs = foreach ($cp in $cps) { Get-GlyphBits $cp }
+$empty = @($glyphs | Where-Object { $_.empty })
+if ($empty.Count -gt 0) { throw ("empty glyphs: " + (($empty | ForEach-Object { "U+{0:X4}" -f $_.cp }) -join " ")) }
+
+# --- 校样图（每字 12px 放大 x5 + 码点标注） ---
+$cell = 60; $cols = 10; $rows = [Math]::Ceiling($glyphs.Count / $cols)
+$spec = [System.Drawing.Bitmap]::new($cols * $cell, $rows * ($cell + 16))
+$sg = [System.Drawing.Graphics]::FromImage($spec)
+$labFont = [System.Drawing.Font]::new("Consolas", 9)
+try {
+  $sg.Clear([System.Drawing.Color]::White)
+  for ($i = 0; $i -lt $glyphs.Count; $i++) {
+    $cx = ($i % $cols) * $cell; $cy = [Math]::Floor($i / $cols) * ($cell + 16)
+    for ($y = 0; $y -lt 12; $y++) {
+      for ($x = 0; $x -lt 12; $x++) {
+        if (($glyphs[$i].bits[$y * 2 + ($x -shr 3)] -band (1 -shl ($x % 8))) -ne 0) {
+          $sg.FillRectangle([System.Drawing.Brushes]::Black, $cx + $x * 5, $cy + $x * 0 + $y * 5, 5, 5)
+        }
+      }
+    }
+    $sg.DrawString(("U+{0:X4}" -f $glyphs[$i].cp), $labFont, [System.Drawing.Brushes]::Black, $cx, $cy + $cell)
+  }
+} finally { $sg.Dispose(); $labFont.Dispose() }
+$specPath = "$env:TEMP/opencode/cn12_specimen.png"
+$spec.Save($specPath, [System.Drawing.Imaging.ImageFormat]::Png)
+$spec.Dispose()
+Write-Host ("specimen -> {0}" -f $specPath)
+
+# --- C 数组 ---
+$fontDir = Join-Path $repo "firmware/filament_box/src/miaoui/fonts"
+$sb = [Text.StringBuilder]::new()
+[void]$sb.AppendLine(("// font_cn12.c - OLED 12x12 Chinese subset ({0} glyphs, ~{1}B Flash)" -f $glyphs.Count, ($glyphs.Count * 24 + $glyphs.Count * 2)))
+[void]$sb.AppendLine("// generated by tools/make_cn12_font.ps1, DO NOT EDIT; change charset first, rerun.")
+[void]$sb.AppendLine('#include "font_cn12.h"')
+[void]$sb.AppendLine("")
+[void]$sb.AppendLine(("static const uint16_t CN12_CODES[{0}] = {{" -f $glyphs.Count))
+$codes = $glyphs | ForEach-Object { "0x{0:X4}" -f $_.cp }
+[void]$sb.AppendLine("    " + ($codes -join ", "))
+[void]$sb.AppendLine("};")
+[void]$sb.AppendLine("")
+[void]$sb.AppendLine(("static const uint8_t CN12_BITS[{0}][24] = {{" -f $glyphs.Count))
+foreach ($gl in $glyphs) {
+  $hex = ($gl.bits | ForEach-Object { "0x{0:X2}" -f $_ }) -join ","
+  [void]$sb.AppendLine(("    {{{0}}}, // U+{1:X4}" -f $hex, $gl.cp))
+}
+[void]$sb.AppendLine("};")
+[void]$sb.AppendLine("")
+[void]$sb.AppendLine("const uint8_t *cn12_get(uint32_t cp) {")
+[void]$sb.AppendLine(("    for (uint16_t i = 0; i < {0}; i++) {{" -f $glyphs.Count))
+[void]$sb.AppendLine("        if (CN12_CODES[i] == cp) return CN12_BITS[i];")
+[void]$sb.AppendLine("    }")
+[void]$sb.AppendLine("    return (const uint8_t *)0;")
+[void]$sb.AppendLine("}")
+$cPath = Join-Path $fontDir "font_cn12.c"
+[IO.File]::WriteAllText($cPath, $sb.ToString(), (New-Object Text.UTF8Encoding($false)))
+Write-Host ("font -> {0}" -f $cPath)
+
+$hPath = Join-Path $fontDir "font_cn12.h"
+$h = @"
+#pragma once
+// font_cn12.h - 12x12 Chinese subset (C linkage; row order matches u8g2_DrawXBMP: 2 bytes/row, LSB=left)
+#include <stdint.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
+#define CN12_W 12
+#define CN12_H 12
+// glyph lookup (row-major 24 bytes); NULL if missing (caller falls back, never draws garbage)
+const uint8_t *cn12_get(uint32_t cp);
+#ifdef __cplusplus
+}
+#endif
+"@
+[IO.File]::WriteAllText($hPath, $h, (New-Object Text.UTF8Encoding($false)))
+Write-Host ("header -> {0}" -f $hPath)
+$font.Dispose()

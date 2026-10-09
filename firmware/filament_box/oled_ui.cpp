@@ -6,6 +6,8 @@
 
 static U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
 
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C& oledShareU8g2() { return u8g2; }
+
 OledUi::OledUi(uint8_t sda, uint8_t scl) : _sda(sda), _scl(scl) {}
 
 bool OledUi::begin() {

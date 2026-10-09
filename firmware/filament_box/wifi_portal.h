@@ -9,8 +9,11 @@ class OledUi;
 void loadWifiCreds(String& ssid, String& pass);
 // 保存到 NVS（下次开机自动用）
 void saveWifiCreds(const String& ssid, const String& pass);
-// 用指定凭据连接（阻塞，最长 timeoutMs），OLED 显示 Connecting 进度；返回是否连上
+// 用指定凭据连接（阻塞，最长 timeoutMs），OLED 显示正在连接进度；返回是否连上
 bool connectWifiWith(const String& ssid, const String& pass,
                      unsigned long timeoutMs, OledUi* ui);
 // 开机调用：连上直接返回；连不上则自动开 AP 配网（阻塞直到配网成功重启）
 void ensureWifiOrPortal(OledUi* ui);
+// 菜单“重置网络”用：只删 ssid/pass 两个 key（打印机配置保留），
+// 置 force_portal 标志后重启；重启后跳过 15 秒直连，直接进 AP 配网（不返回）
+void requestWifiReset();
