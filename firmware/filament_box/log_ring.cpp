@@ -17,7 +17,8 @@ String logUptime() {
 
 void logLine(const String& s) {
   Serial.println(s);
-  String line = logUptime() + s;
+  String line = logUptime();
+  line += s;
   line.replace("\r", "");
   line.replace("\n", " ");
   if (line.length() > LOG_LINE_LEN) line = line.substring(0, LOG_LINE_LEN - 1) + "~";
