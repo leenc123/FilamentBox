@@ -1,6 +1,7 @@
 // rfid_reader.cpp
 #include <SPI.h>
 #include "rfid_reader.h"
+#include "log_ring.h"
 
 RfidReader::RfidReader(uint8_t sck, uint8_t mosi, uint8_t miso, uint8_t rst,
                        const uint8_t* csPins, uint8_t nslots)
@@ -14,9 +15,37 @@ void RfidReader::begin() {
   pinMode(_rst, OUTPUT);
   digitalWrite(_rst, HIGH);
   for (uint8_t i = 0; i < _n; i++) {
+    _present[i] = false;
+    _retryMs[i] = 0;
+    _failStreak[i] = 0;
     _pcs[i] = new MFRC522(_cs[i], _rst);
+    if (!_pcs[i]) continue;
     _pcs[i]->PCD_Init();
+    // 缺模块时 PCD_Init 也不阻塞（纯 SPI 读写，MISO 悬空读回垃圾值），probe 判定即可
+    _present[i] = probeSlot(i);
+    _retryMs[i] = millis();
+    logLine("[RFID] slot " + String(i) + (_present[i] ? ": reader present" : ": no reader (retry in background)"));
   }
+}
+
+bool RfidReader::probeSlot(uint8_t i) {
+  if (i >= _n || !_pcs[i]) return false;
+  uint8_t v1 = _pcs[i]->PCD_ReadRegister(MFRC522::VersionReg);
+  uint8_t v2 = _pcs[i]->PCD_ReadRegister(MFRC522::VersionReg);
+  // 0x00/0xFF = 总线无应答；两次一致才认（MISO 悬空时读数随机跳变）
+  return v1 == v2 && v1 != 0x00 && v1 != 0xFF;
+}
+
+bool RfidReader::ensurePresent(uint8_t i) {
+  if (i >= _n || !_pcs[i]) return false;
+  if (_present[i]) return true;
+  // 缺席槽位每 2 秒重探一次，面包板上热插上模块后自动识别，无需重启
+  if (millis() - _retryMs[i] < 2000) return false;
+  _retryMs[i] = millis();
+  _pcs[i]->PCD_Init();
+  _present[i] = probeSlot(i);
+  if (_present[i]) logLine("[RFID] slot " + String(i) + ": reader attached");
+  return _present[i];
 }
 
 // 寻卡 + 防冲突 + 选中，成功输出 uid
@@ -43,10 +72,23 @@ bool RfidReader::isUltralight(MFRC522* r) {
 }
 
 bool RfidReader::readSlot(uint8_t i, uint8_t b4[16], uint8_t b5[16]) {
-  if (i >= _n || !_pcs[i]) return false;
+  if (i >= _n || !_pcs[i] || !ensurePresent(i)) return false;
   MFRC522* r = _pcs[i];
   MFRC522::Uid uid;
-  if (!selectCard(i, uid)) return false;
+  if (!selectCard(i, uid)) {
+    // 无卡和掉模块在这里 indistinguishable：连续失败满 4 轮才用探针仲裁，
+    // 探针只读 VersionReg，不影响在用读卡器
+    if (++_failStreak[i] >= 4) {
+      _failStreak[i] = 0;
+      if (_present[i] && !probeSlot(i)) {
+        _present[i] = false;
+        _retryMs[i] = millis();
+        logLine("[RFID] slot " + String(i) + ": reader detached");
+      }
+    }
+    return false;
+  }
+  _failStreak[i] = 0;
 
   uint8_t len = 18;
   uint8_t buf[18];
@@ -86,7 +128,10 @@ bool RfidReader::readSlot(uint8_t i, uint8_t b4[16], uint8_t b5[16]) {
 }
 
 bool RfidReader::writeSlot(uint8_t i, const uint8_t b4[16], const uint8_t b5[16]) {
-  if (i >= _n || !_pcs[i]) return false;
+  if (i >= _n || !_pcs[i] || !ensurePresent(i)) {
+    Serial.printf("[RFID] slot %u: no reader, write skipped\n", i);
+    return false;
+  }
   MFRC522* r = _pcs[i];
   MFRC522::Uid uid;
   if (!selectCard(i, uid)) {

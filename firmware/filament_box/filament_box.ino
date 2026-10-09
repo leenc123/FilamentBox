@@ -143,12 +143,12 @@ static bool pushSlotNow(uint8_t i, String& errOut) {
     String shown = String(shortFilamentName(info));
     if (shown.length() > 12) shown = shown.substring(0, 12);
     statusText = "SENT " + String(trayDisplayNo(i)) + " " + shown;
-    Serial.println(statusText);
+    logLine(statusText);
     return true;
   }
   pushFailStreak++;
   statusText = "FAIL " + String(trayDisplayNo(i));
-  Serial.println(err);
+  logLine("FAIL " + String(trayDisplayNo(i)) + " " + err);
   errOut = err;
   // WiFi 通但连续失败达阈值：弹 OLED 配置提示（refreshOled 内 sticky 显示）
   if (pushFailStreak >= PRINTER_HINT_STREAK &&
@@ -219,15 +219,14 @@ static void handleDashWrite() {
     web.send(400, "text/html; charset=utf-8", dashWriteForm("encode fail", false));
     return;
   }
-  Serial.printf("[WRITE] slot %d type %s color %s\n",
-                slot, type.c_str(), color.c_str());
+  logLine("[WRITE] slot " + String(slot) + " type " + type + " color " + color);
   if (!reader.writeSlot((uint8_t)slot, b4, b5)) {
-    Serial.printf("[WRITE] slot %d failed\n", slot);
+    logLine("[WRITE] slot " + String(slot) + " failed");
     web.send(500, "text/html; charset=utf-8",
              dashWriteResult(false, "write failed: 卡是否放在该槽读卡器上?"));
     return;
   }
-  Serial.printf("[WRITE] slot %d OK\n", slot);
+  logLine("[WRITE] slot " + String(slot) + " OK");
   // 写成功：同步槽位快照并置脏，推送统一走 loop 后台（每轮最多一槽）；
   // 本回调内不再做 TLS，Web 秒回，避免浏览器超时重试导致重复写卡。
   // slotSent 不动：后台推成功才记；失败也记（抑制自动重试，拔卡清标记后重插可再推）。
@@ -299,8 +298,7 @@ bool fbxScreenWrite(int slot1, int matIdx, int brandIdx, int colorIdx) {
       if (!winfo || !encodeCard(type, color, b4, b5)) {
         st = "WRITE " + String(trayDisplayNo(slot)) + " encode fail";
       } else {
-        Serial.printf("[WRITE] screen slot %d type %s color %s\n",
-                      slot, type.c_str(), color.c_str());
+        logLine("[WRITE] screen slot " + String(slot) + " type " + type + " color " + color);
         if (!reader.writeSlot(slot, b4, b5)) {
           st = "WRITE " + String(trayDisplayNo(slot)) + " no card";
         } else {
@@ -315,7 +313,7 @@ bool fbxScreenWrite(int slot1, int matIdx, int brandIdx, int colorIdx) {
   }
   statusText = st;
   shownKey = "";  // 强制刷屏（老屏直刷；MiaoUI 状态行下轮喂数同步）
-  Serial.println(st);
+  logLine(st);
   return ok;
 }
 
@@ -324,9 +322,9 @@ const char* fbxLastWriteMsg() { return statusText.c_str(); }
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("[BOOT] start");
+  logLine("[BOOT] start");
   reader.begin();
-  Serial.println("[BOOT] reader ok");
+  logLine("[BOOT] reader ok");
   ledBegin();  // GPIO2 strapping 安全点：reader 之后再 ledBegin 即安全
   ledSet(LED_WIFI_CONNECT);
 
@@ -334,18 +332,18 @@ void setup() {
   ui.begin();
   // MiaoUI 接管正常态显示；失败/无屏回落老直刷屏（配网阻塞段始终用老屏）
   if (ui.ok()) {
-    Serial.printf("[MIAOUI] %s free=%u\n",
-                  miaouiSetupMenu() ? "active" : "fallback",
-                  (unsigned)ESP.getFreeHeap());
+    bool miaoUp = miaouiSetupMenu();
+    logLine("[MIAOUI] " + String(miaoUp ? "active" : "fallback") +
+            " free=" + String((unsigned)ESP.getFreeHeap()));
   }
 
   // 打印机配置：NVS 优先，config.h 保底
   loadPrinterCfg(gPrinter);
-  Serial.println("[BOOT] printer cfg ok");
+  logLine("[BOOT] printer cfg ok");
 
   // 无网络自动开 AP 配网（阻塞直到配网成功重启；OLED 显示进度）
   ensureWifiOrPortal(&ui);
-  Serial.println("[BOOT] wifi ok");
+  logLine("[BOOT] wifi ok");
   ledSet(LED_HEARTBEAT);  // 联网成功回心跳
 
   // 开机 IP 页（仅老屏回落时显示；MiaoUI 接管时 IP 在 System>IP 菜单里看）
@@ -358,13 +356,11 @@ void setup() {
       ""
     };
     ui.showLines(splash, 5);
-    Serial.print("[BOOT] ip ");
-    Serial.println(WiFi.localIP());
+    logLine("[BOOT] ip " + WiFi.localIP().toString());
     for (uint16_t w = 0; w < OLED_IP_SPLASH_MS; w += 50) { ledTick(); delay(50); }
     shownKey = "";  // 强制重刷主页
   } else if (ui.ok()) {
-    Serial.print("[BOOT] ip ");
-    Serial.println(WiFi.localIP());
+    logLine("[BOOT] ip " + WiFi.localIP().toString());
   }
 
   // WiFi 连上之后再起常驻 Web 服务（管理首页 / + 写卡 /write + 配置 /setup）
@@ -377,11 +373,11 @@ void setup() {
   web.on("/log/stream", handleDashLogStream);
   web.on("/log.txt", handleDashLogText);
   web.on("/log/clear", HTTP_POST, handleDashLogClear);
-  Serial.println("[BOOT] setup server ok");
+  logLine("[BOOT] setup server ok");
 
   statusText = "idle";
   refreshOled();
-  Serial.println("FilamentBox ready");
+  logLine("FilamentBox ready");
 }
 
 void loop() {

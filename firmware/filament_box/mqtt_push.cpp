@@ -3,6 +3,7 @@
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
 #include "mqtt_push.h"
+#include "log_ring.h"
 
 String buildAmsSetting(unsigned long seq, uint8_t amsId, uint8_t trayId,
                        const FilamentInfo& info, const String& colorRgba,
@@ -20,9 +21,7 @@ String buildAmsSetting(unsigned long seq, uint8_t amsId, uint8_t trayId,
 
 bool pushAmsSetting(const char* printerIp, const char* serial, const char* accessCode,
                     const String& payload, uint16_t port, bool useTls, String* errMsg) {
-  Serial.print("[MQTT] port ");
-  Serial.print(port);
-  Serial.println(useTls ? " tls" : " plain");
+  logLine("[MQTT] port " + String(port) + (useTls ? " tls" : " plain"));
 
   char topic[64];
   snprintf(topic, sizeof(topic), "device/%s/request", serial);
@@ -34,6 +33,8 @@ bool pushAmsSetting(const char* printerIp, const char* serial, const char* acces
     net.setTimeout(5);
     PubSubClient mqtt(net);
     mqtt.setServer(printerIp, port);
+    mqtt.setSocketTimeout(5);  // 单次推送 5 秒封顶：坏网/配错 IP 时快速返回，不长期占住 loop
+    mqtt.setKeepAlive(10);
     mqtt.setBufferSize(512);
     if (!mqtt.connect("filamentbox", "bblp", accessCode)) {
       if (errMsg) *errMsg = "mqtt connect fail st=" + String(mqtt.state());
@@ -47,6 +48,8 @@ bool pushAmsSetting(const char* printerIp, const char* serial, const char* acces
     net.setTimeout(5);
     PubSubClient mqtt(net);
     mqtt.setServer(printerIp, port);
+    mqtt.setSocketTimeout(5);
+    mqtt.setKeepAlive(10);
     mqtt.setBufferSize(512);
     if (!mqtt.connect("filamentbox", "bblp", accessCode)) {
       if (errMsg) *errMsg = "mqtt connect fail st=" + String(mqtt.state());

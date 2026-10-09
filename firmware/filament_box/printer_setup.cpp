@@ -5,6 +5,7 @@
 #include "printer_setup.h"
 #include "config.h"
 #include "oled_ui.h"
+#include "log_ring.h"
 
 static WebServer setupServer(80);
 static PrinterCfg* g_cfg = nullptr;
@@ -149,6 +150,7 @@ static void handleSetupSave() {
   if (!checkPrinterReachable(ip, port)) {
     setupMsg = "IP/端口不可达（" + ip + ":" + String(port) +
                "），检查打印机 IP 与局域网模式，旧配置未覆盖";
+    logLine("[SETUP] save rejected, unreachable " + ip + ":" + String(port));
     setupServer.send(200, "text/html; charset=utf-8", setupForm());
     return;
   }
@@ -158,6 +160,7 @@ static void handleSetupSave() {
   g_cfg->dbg = dbg;
   savePrinterCfg(*g_cfg);
   setupMsg = "";
+  logLine("[SETUP] saved " + ip + " sn " + sn + (dbg ? " plain1883" : " tls8883"));
   String ok = "<!doctype html><html><head><meta charset='utf-8'>"
               "<meta name='viewport' content='width=device-width,initial-scale=1'>"
               "<title>FilamentBox 打印机配置</title>";
