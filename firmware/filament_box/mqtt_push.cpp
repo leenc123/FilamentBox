@@ -33,9 +33,15 @@ bool pushAmsSetting(const char* printerIp, const char* serial, const char* acces
     net.setTimeout(5);
     PubSubClient mqtt(net);
     mqtt.setServer(printerIp, port);
-    mqtt.setSocketTimeout(5);  // 单次推送 5 秒封顶：坏网/配错 IP 时快速返回，不长期占住 loop
+    mqtt.setSocketTimeout(5);  // MQTT 握手 5 秒封顶；TCP 建连由下面的预建连 5 秒封顶，单次推送最坏约 10 秒
     mqtt.setKeepAlive(10);
     mqtt.setBufferSize(512);
+    // 预建连（5 秒超时）：通则 PubSubClient 复用该连接只做 MQTT 握手；
+    // 不通 5 秒即返，不再被无超时的 TCP 建连卡住约 30 秒
+    if (!net.connected() && !net.connect(printerIp, port, 5000)) {
+      if (errMsg) *errMsg = "tcp connect timeout";
+      return false;
+    }
     if (!mqtt.connect("filamentbox", "bblp", accessCode)) {
       if (errMsg) *errMsg = "mqtt connect fail st=" + String(mqtt.state());
       return false;
@@ -48,9 +54,15 @@ bool pushAmsSetting(const char* printerIp, const char* serial, const char* acces
     net.setTimeout(5);
     PubSubClient mqtt(net);
     mqtt.setServer(printerIp, port);
-    mqtt.setSocketTimeout(5);
+    mqtt.setSocketTimeout(5);  // MQTT 握手 5 秒封顶；TCP 建连由下面的预建连 5 秒封顶
     mqtt.setKeepAlive(10);
     mqtt.setBufferSize(512);
+    // 预建连（5 秒超时）：通则 PubSubClient 复用该连接只做 MQTT 握手；
+    // 不通 5 秒即返，不再被无超时的 TCP 建连卡住约 30 秒
+    if (!net.connected() && !net.connect(printerIp, port, 5000)) {
+      if (errMsg) *errMsg = "tcp connect timeout";
+      return false;
+    }
     if (!mqtt.connect("filamentbox", "bblp", accessCode)) {
       if (errMsg) *errMsg = "mqtt connect fail st=" + String(mqtt.state());
       return false;
